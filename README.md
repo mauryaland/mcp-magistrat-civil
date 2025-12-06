@@ -10,7 +10,7 @@ Ce projet permet à Claude d'accéder à :
 ## Structure du dépôt
 
 ```
-mcp-droit-francais/
+mcp-magistrat-civil/
 ├── servers/
 │   ├── judilibre_mcp_server.py     # Serveur MCP Judilibre
 │   └── legifrance_mcp_server.py    # Serveur MCP Légifrance
