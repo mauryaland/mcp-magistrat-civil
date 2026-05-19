@@ -45,14 +45,13 @@ Ce skill guide Claude pour analyser des dossiers juridiques civils en appliquant
 
 | Code | Publication | Coefficient | Signification |
 |------|-------------|-------------|---------------|
-| `b` | Publié au Bulletin | 10/10 | Arrêt de principe |
 | `r` | Publié au Rapport | 10/10 | Sélectionné pour le rapport annuel |
-| `c` | Communiqué | 9/10 | Importance majeure |
+| `b` | Publié au Bulletin | 9/10 | Arrêt de principe |
+| `c` | Communiqué | 8/10 | Importance majeure |
 | `l` | Publié aux Lettres de chambre | 6/10 | Intérêt doctrinal |
 | `n` | Non publié | 3/10 | Application jurisprudence établie |
 
-<!-- En théorie, les arrêts sélectionnés au rapport sont toujours issus du bulletin. Ce sera donc toujours B ou B+R, jamais R seul. De plus, il paraît incohérent d'émettre moins au rapport qu'aux communiqués ou qu'au bulletin, vu que par définition il a une importance au moins égale au bulletin (vu qu'ils en sont tous issus). J'hésite même à mettre Rapport 10, Bulletin 9 et Communiqué 8, puisqu'en théorie ils peuvent publier au rapport pour éclaircir un arrêt précédent du bulletin. -->
-
+<!-- En théorie, les arrêts sélectionnés au rapport sont toujours issus du bulletin. Ce sera donc toujours B ou B+R, jamais R seul. De plus, il paraît incohérent d'émettre moins au rapport qu'aux communiqués ou qu'au bulletin, vu que par définition il a une importance au moins égale au bulletin (vu qu'ils en sont tous issus). -->
 ### Règles de recherche OBLIGATOIRES
 
 ⚠️ **NE JAMAIS limiter la recherche à une seule chambre** sans vérifier les formations solennelles.
@@ -66,7 +65,7 @@ Ce skill guide Claude pour analyser des dossiers juridiques civils en appliquant
    ```
   <!-- ajout du rapport ici -->
   
-2. **Ensuite : Chambres pertinentes avec Bulletin**
+2. **Ensuite : Chambres pertinentes avec Rapport et Bulletin**
    ```
    chamber: ["civ1", "civ2", "civ3", "comm", "soc", "cr"]  # selon la matière
    publication: ["r", "b"]
@@ -116,9 +115,9 @@ Ce skill guide Claude pour analyser des dossiers juridiques civils en appliquant
 
 | Code | Publication | Coefficient |
 |------|-------------|-------------|
-| `b` | Publié au Bulletin | 10/10 |
 | `r` | Publié au Rapport | 10/10 |
-| `c` | Communiqué | 9/10 |
+| `b` | Publié au Bulletin | 9/10 |
+| `c` | Communiqué | 8/10 |
 | `l` | Publié aux Lettres de chambre | 6/10 |
 | `n` | Non publié | 3/10 |
 <!-- Idem supra-->
