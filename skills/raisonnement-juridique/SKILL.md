@@ -2,7 +2,7 @@
 name: "raisonnement-juridique"
 description: "Modélise le raisonnement juridique d'un magistrat français pour l'analyse de dossiers civils. Utiliser ce skill pour analyser un litige et identifier les questions juridiques, construire un raisonnement juridique structuré (syllogisme), rédiger une motivation de jugement civil, rechercher la jurisprudence et les textes applicables via Judilibre et Légifrance, qualifier juridiquement des faits et actes, distinguer prétentions, moyens et arguments. Basé sur les Fiches méthodologiques de rédaction du jugement civil (ENM/Cour de cassation, 2023)."
 ---
-
+d
 # Raisonnement Juridique - Méthodologie du Magistrat Civil
 
 Ce skill guide Claude pour analyser des dossiers juridiques civils en appliquant la méthodologie du magistrat français, basée sur les fiches méthodologiques de l'ENM/Cour de cassation (2023).
@@ -37,19 +37,21 @@ Ce skill guide Claude pour analyser des dossiers juridiques civils en appliquant
 |-----------|------------|-------------|----------------|
 | **Assemblée plénière** | 19 | 10/10 | Question de principe, second pourvoi, résistance |
 | **Chambres mixtes** | ≥13 | 9/10 | Divergences entre chambres, partage des voix |
-| **Formation plénière chambre** | Variable | 7/10 | Revirement possible, question sensible |
+| **Formation plénière de chambre** | >10 | 7/10 | Revirement possible, question sensible |
 | **Formation de section** | ≥5 | 5/10 | Affaires courantes complexes |
 | **Formation restreinte** | 3 | 3/10 | Pourvoi irrecevable ou manifestement infondé |
-
+<!-- Pour les formations plénières de chambre c'est variable selon la chambre mais ça sera toujours supérieur à 10-->
 ### Publications (par ordre d'importance)
 
 | Code | Publication | Coefficient | Signification |
 |------|-------------|-------------|---------------|
 | `b` | Publié au Bulletin | 10/10 | Arrêt de principe |
+| `r` | Publié au Rapport | 10/10 | Sélectionné pour le rapport annuel |
 | `c` | Communiqué | 9/10 | Importance majeure |
-| `r` | Publié au Rapport | 8/10 | Sélectionné pour le rapport annuel |
 | `l` | Publié aux Lettres de chambre | 6/10 | Intérêt doctrinal |
 | `n` | Non publié | 3/10 | Application jurisprudence établie |
+
+<!-- En théorie, les arrêts sélectionnés au rapport sont toujours issus du bulletin. Ce sera donc toujours B ou B+R, jamais R seul. De plus, il paraît incohérent d'émettre moins au rapport qu'aux communiqués ou qu'au bulletin, vu que par définition il a une importance au moins égale au bulletin (vu qu'ils en sont tous issus). J'hésite même à mettre Rapport 10, Bulletin 9 et Communiqué 8, puisqu'en théorie ils peuvent publier au rapport pour éclaircir un arrêt précédent du bulletin. -->
 
 ### Règles de recherche OBLIGATOIRES
 
@@ -60,15 +62,17 @@ Ce skill guide Claude pour analyser des dossiers juridiques civils en appliquant
 1. **D'abord : Formations solennelles**
    ```
    chamber: ["pl", "mi"]
-   publication: ["b", "c"]
+   publication: ["r", "b", "c"]
    ```
-   
+  <!-- ajout du rapport ici -->
+  
 2. **Ensuite : Chambres pertinentes avec Bulletin**
    ```
    chamber: ["civ1", "civ2", "civ3", "comm", "soc", "cr"]  # selon la matière
-   publication: ["b"]
+   publication: ["r", "b"]
    ```
-   
+<!-- ajout du rapport ici -->
+
 3. **Enfin : Recherche exhaustive sans filtre de chambre**
    ```
    sort: "scorepub"  # Tri pertinence + publication
@@ -77,10 +81,11 @@ Ce skill guide Claude pour analyser des dossiers juridiques civils en appliquant
 ### Principe d'articulation
 
 - **Un arrêt d'assemblée plénière > tout arrêt de chambre** (même récent)
+- **Un arrêt publié au Rapport et au Bulletin > tout arrêt publié au Bulletin** (même récent)
 - **Un arrêt publié au Bulletin > un arrêt non publié**
 - **Entre deux arrêts de même niveau, le plus récent prévaut**
 - **Effet contraignant** : après cassation par l'assemblée plénière, la juridiction de renvoi **doit** se conformer à la décision (art. L.431-4 COJ)
-
+<!--Ajout Entre un arrêt B et un arrêt B+R, toujours privilégier le B+R. -->
 ### Codes des chambres (taxonomie Judilibre)
 
 | Code | Chambre |
@@ -101,30 +106,30 @@ Ce skill guide Claude pour analyser des dossiers juridiques civils en appliquant
 
 | Code | Formation | Magistrats |
 |------|-----------|------------|
-| `fp` | Formation plénière de chambre | Variable |
+| `fp` | Formation plénière de chambre | >10 |
 | `fs` | Formation de section | ≥5 |
 | `f` | Formation restreinte | 3 |
 | `frh` | Formation restreinte hors RNSM/NA | 3 |
 | `frr` | Formation restreinte RNSM/NA | 3 |
-
+<!-- Pour les formations plénières de chambre c'est variable selon la chambre mais ça sera toujours supérieur à 10-->
 ### Codes de publication (taxonomie Judilibre)
 
 | Code | Publication | Coefficient |
 |------|-------------|-------------|
 | `b` | Publié au Bulletin | 10/10 |
+| `r` | Publié au Rapport | 10/10 |
 | `c` | Communiqué | 9/10 |
-| `r` | Publié au Rapport | 8/10 |
 | `l` | Publié aux Lettres de chambre | 6/10 |
 | `n` | Non publié | 3/10 |
-
+<!-- Idem supra-->
 ## Points de vigilance pour la recherche de jurisprudence de la Cour de cassation
 
 ✅ **À faire** :
 - Toujours commencer par les formations solennelles (`pl`, `mi`)
 - Vérifier la publication de chaque arrêt cité (`b`, `r`, `c`, `l`, `n`)
-- Citer les arrêts publiés au Bulletin (`b`) de préférence
+- Citer les arrêts publiés au Bulletin et au Rapport (`r`, `b`) de préférence, puis seulement au Bulletin (`b`)
 - Vérifier qu'un arrêt ancien n'a pas été infirmé
-
+<!-- J'ajuste avec le rapport->
 ❌ **À éviter** :
 - Se limiter à une seule chambre sans vérifier `pl`/`mi`
 - Citer un arrêt non publié (`n`) comme fondement principal
