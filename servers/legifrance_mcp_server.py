@@ -395,8 +395,10 @@ def epoch_ms_to_date(value) -> Optional[datetime]:
     if value is None or value == "":
         return None
     try:
-        return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).replace(tzinfo=None)
-    except (ValueError, TypeError, OverflowError, OSError):
+        # Pas de datetime.fromtimestamp : sous Windows il lève OSError avant 1970
+        # (versions d'origine du Code civil, 1804).
+        return datetime(1970, 1, 1) + timedelta(milliseconds=int(value))
+    except (ValueError, TypeError, OverflowError):
         return None
 
 
@@ -846,7 +848,14 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
             if isinstance(result, dict) and "error" in result:
                 error_text = f"❌ Erreur lors de la récupération de l'article: {result['error']}"
                 return [TextContent(type="text", text=error_text)]
-            
+
+            # Identifiant inconnu : l'API répond {"article": null}
+            if isinstance(result, dict) and "article" in result and not result["article"]:
+                return [TextContent(
+                    type="text",
+                    text=f"❌ Article `{article_id}` introuvable sur Légifrance (identifiant inexistant)."
+                )]
+
             # Formatage de la réponse
             formatted_result = format_article_response(result)
             return [TextContent(type="text", text=formatted_result)]
@@ -881,6 +890,12 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
                     text=f"❌ Erreur lors de la récupération de l'article: {article_result['error']}"
                 )]
             article = article_result.get("article", article_result)
+            # Identifiant inconnu : l'API répond {"article": null}
+            if not article:
+                return [TextContent(
+                    type="text",
+                    text=f"❌ Article `{article_id}` introuvable sur Légifrance (identifiant LEGIARTI inexistant)."
+                )]
             cid = article.get("cid") or article_id
 
             # /consult/getArticleByCid renvoie toutes les versions dans listArticle
