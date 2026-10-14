@@ -19,7 +19,7 @@ import logging
 import asyncio
 from typing import Any, Dict, Optional, List, Sequence
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import requests
 from dotenv import load_dotenv
@@ -382,7 +382,60 @@ def format_article_response(article_data: Dict) -> str:
                 lines.append(f"- {type_lien}: {texte_lien} (`{cible}`)")
             elif cible:
                 lines.append(f"- {type_lien}: `{cible}`")
-    
+
+    return "\n".join(lines)
+
+
+# ============================================================================
+# VERSIONS D'UN ARTICLE À UNE DATE
+# ============================================================================
+
+def epoch_ms_to_date(value) -> Optional[datetime]:
+    """Convertit un timestamp epoch en millisecondes (format de l'API) en datetime."""
+    if value is None or value == "":
+        return None
+    try:
+        return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).replace(tzinfo=None)
+    except (ValueError, TypeError, OverflowError, OSError):
+        return None
+
+
+def format_date(d: Optional[datetime]) -> str:
+    """Date lisible ; la date de fin 2999-01-01 de l'API signifie « sans date de fin »."""
+    if d is None:
+        return "?"
+    if d.year >= 2999:
+        return "(sans date de fin)"
+    return d.strftime("%Y-%m-%d")
+
+
+def select_version_at_date(versions: List[Dict], date: datetime) -> Optional[Dict]:
+    """
+    Retourne la version applicable à `date` : date_debut <= date < date_fin.
+
+    Les versions « mort-nées » (MODIFIE_MORT_NE) ne sont jamais retenues. Retourne
+    None si l'article n'existait pas encore à cette date ou n'existait plus.
+    """
+    for version in versions:
+        if version.get("etat") == "MODIFIE_MORT_NE":
+            continue
+        debut = epoch_ms_to_date(version.get("dateDebut"))
+        fin = epoch_ms_to_date(version.get("dateFin"))
+        if debut is None:
+            continue
+        if debut <= date and (fin is None or date < fin):
+            return version
+    return None
+
+
+def format_version_timeline(versions: List[Dict], selected_id: Optional[str]) -> str:
+    """Frise de toutes les versions d'un article, la version retenue étant signalée."""
+    lines = ["## Toutes les versions de l'article\n"]
+    for version in sorted(versions, key=lambda v: int(v.get("dateDebut") or 0)):
+        debut = format_date(epoch_ms_to_date(version.get("dateDebut")))
+        fin = format_date(epoch_ms_to_date(version.get("dateFin")))
+        marque = " ← version applicable" if version.get("id") == selected_id else ""
+        lines.append(f"- `{version.get('id')}` : {debut} → {fin} ({version.get('etat', '')}){marque}")
     return "\n".join(lines)
 
 
@@ -556,6 +609,49 @@ Note:
             }
         ),
         Tool(
+            name="recuperer_article_a_date",
+            description="""
+Récupère la version d'un article applicable à une date donnée, avec la frise de toutes ses versions.
+
+recuperer_article renvoie la version identifiée par son LEGIARTI, en pratique souvent la version
+en vigueur aujourd'hui. Pour un litige, la version applicable est en général celle en vigueur à la
+date des faits (ou de la conclusion du contrat, de l'introduction de l'instance, selon les règles
+d'application de la loi dans le temps), pas celle d'aujourd'hui ni nécessairement celle de la date
+de la décision. Utiliser cet outil dès qu'un arrêt vise un article « dans sa rédaction antérieure »
+ou que les faits sont anciens.
+
+Args:
+    article_id: Identifiant LEGIARTI de n'importe quelle version de l'article
+    date: Date de référence (YYYY-MM-DD). Absente : la frise seule, avec la version en vigueur aujourd'hui.
+
+Returns:
+    - Texte intégral de la version applicable à la date, avec ses dates de début et de fin
+    - Frise de toutes les versions (identifiant, période, état)
+    - Lien Légifrance vers la version
+
+Workflow recommandé:
+    1. rechercher_code("responsabilité du fait d'autrui", "Code civil") → obtenir un LEGIARTI
+    2. recuperer_article_a_date("LEGIARTI000006436516", "1991-07-12") → article 1165 ancien du Code civil
+
+Note:
+    Si l'article n'existait pas à la date demandée, l'outil le dit et renvoie la frise.
+""",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "article_id": {
+                        "type": "string",
+                        "description": "Identifiant LEGIARTI d'une version quelconque de l'article"
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "Date de référence au format YYYY-MM-DD (date des faits, du contrat, de l'arrêt...)"
+                    }
+                },
+                "required": ["article_id"]
+            }
+        ),
+        Tool(
             name="rechercher_code",
             description="""
 Recherche des articles juridiques dans les codes de loi français.
@@ -567,6 +663,7 @@ Args:
     type_recherche: Type de recherche (\"TOUS_LES_MOTS_DANS_UN_CHAMP\", \"EXACTE\", \"UN_DES_MOT\")
     sort: Tri des résultats (\"PERTINENCE\", \"DATE_DESC\", \"DATE_ASC\")
     max_results: Nombre maximum de résultats (défaut: 10, maximum: 100)
+    date_version: Date (YYYY-MM-DD) à laquelle chercher dans les versions du code (défaut: aujourd'hui)
 
 Returns:
     Liste de résultats avec les identifiants d'articles (LEGIARTI) pour utilisation avec recuperer_article
@@ -587,7 +684,8 @@ Note:
                     "champ": {"type": "string", "default": "ALL"},
                     "type_recherche": {"type": "string", "default": "TOUS_LES_MOTS_DANS_UN_CHAMP"},
                     "sort": {"type": "string", "default": "PERTINENCE"},
-                    "max_results": {"type": "integer", "default": 10}
+                    "max_results": {"type": "integer", "default": 10},
+                    "date_version": {"type": "string", "description": "Date YYYY-MM-DD des versions à interroger"}
                 },
                 "required": ["code_name", "search"]
             }
@@ -752,7 +850,77 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
             # Formatage de la réponse
             formatted_result = format_article_response(result)
             return [TextContent(type="text", text=formatted_result)]
-        
+
+        # Version d'un article applicable à une date
+        elif name == "recuperer_article_a_date":
+            article_id = arguments.get("article_id", "").strip()
+            date_str = (arguments.get("date") or "").strip()
+
+            if not article_id:
+                return [TextContent(
+                    type="text",
+                    text="❌ Erreur: L'identifiant de l'article (article_id) est requis."
+                )]
+
+            if date_str:
+                try:
+                    date_ref = datetime.strptime(date_str, "%Y-%m-%d")
+                except ValueError:
+                    return [TextContent(
+                        type="text",
+                        text=f"❌ Erreur: date '{date_str}' invalide, format attendu YYYY-MM-DD."
+                    )]
+            else:
+                date_ref = datetime.now(timezone.utc).replace(tzinfo=None)
+
+            # Le cid (identifiant commun à toutes les versions) se lit sur une version quelconque
+            article_result = await make_api_request("/consult/getArticle", {"id": article_id})
+            if isinstance(article_result, dict) and "error" in article_result:
+                return [TextContent(
+                    type="text",
+                    text=f"❌ Erreur lors de la récupération de l'article: {article_result['error']}"
+                )]
+            article = article_result.get("article", article_result)
+            cid = article.get("cid") or article_id
+
+            # /consult/getArticleByCid renvoie toutes les versions dans listArticle
+            versions_result = await make_api_request("/consult/getArticleByCid", {"cid": cid})
+            if isinstance(versions_result, dict) and "error" in versions_result:
+                return [TextContent(
+                    type="text",
+                    text=f"❌ Erreur lors de la récupération des versions: {versions_result['error']}"
+                )]
+            versions = versions_result.get("listArticle") or []
+            if not versions:
+                return [TextContent(
+                    type="text",
+                    text=f"❌ Aucune version trouvée pour le cid `{cid}`."
+                )]
+
+            selected = select_version_at_date(versions, date_ref)
+            timeline = format_version_timeline(versions, selected.get("id") if selected else None)
+
+            if selected is None:
+                result_text = (
+                    f"⚠️ Aucune version de l'article (cid `{cid}`) n'était en vigueur le "
+                    f"{date_ref.strftime('%Y-%m-%d')}.\n\n{timeline}"
+                )
+                return [TextContent(type="text", text=result_text)]
+
+            lines = [f"**Version applicable au {date_ref.strftime('%Y-%m-%d')}**\n"]
+            # Dates lisibles à la place des timestamps en millisecondes de l'API
+            selected_display = dict(selected)
+            selected_display["dateDebut"] = format_date(epoch_ms_to_date(selected.get("dateDebut")))
+            selected_display["dateFin"] = format_date(epoch_ms_to_date(selected.get("dateFin")))
+            lines.append(format_article_response({"article": selected_display}))
+            lines.append(
+                f"**🔗 Version à la date sur Légifrance**: https://www.legifrance.gouv.fr/codes/article_lc/"
+                f"{selected.get('id')}/{date_ref.strftime('%Y-%m-%d')}"
+            )
+            lines.append("\n---\n")
+            lines.append(timeline)
+            return [TextContent(type="text", text="\n".join(lines))]
+
         # Recherche dans les codes
         elif name == "rechercher_code":
             code_name = arguments.get("code_name")
@@ -799,6 +967,19 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent]:
                     "typePagination": "ARTICLE"
                 }
             }
+            
+            if arguments.get("date_version"):
+                try:
+                    date_version = datetime.strptime(arguments["date_version"], "%Y-%m-%d")
+                except ValueError:
+                    return [TextContent(
+                        type="text",
+                        text=f"❌ Erreur: date_version '{arguments['date_version']}' invalide, format attendu YYYY-MM-DD."
+                    )]
+                request_data["recherche"]["filtres"].append({
+                    "facette": "DATE_VERSION",
+                    "singleDate": int(date_version.replace(tzinfo=timezone.utc).timestamp() * 1000)
+                })
             
             result = await make_api_request("/search", request_data)
             
