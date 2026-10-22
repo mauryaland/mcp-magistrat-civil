@@ -141,10 +141,11 @@ La compétence `raisonnement-juridique` guide Claude pour analyser des dossiers 
 
 | Outil | Description |
 |-------|-------------|
-| `rechercher_code` | Rechercher dans les codes (Code civil, Code du travail...) |
+| `rechercher_code` | Rechercher dans les codes (Code civil, Code du travail...), à une date donnée avec `date_version` |
 | `rechercher_dans_texte_legal` | Rechercher dans les lois et décrets |
 | `recherche_journal_officiel` | Rechercher dans le JORF |
 | `recuperer_article` | Récupérer le texte intégral d'un article par son ID LEGIARTI |
+| `recuperer_article_a_date` | Récupérer la version d'un article applicable à une date (faits, contrat, arrêt) et la frise de toutes ses versions |
 
 ## Exemple d'utilisation
 

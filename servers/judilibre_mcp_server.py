@@ -121,12 +121,14 @@ async def make_api_request(endpoint: str, params: Dict) -> Dict:
         
         # Convertir les types pour l'API
         for key, value in list(clean_params.items()):
-            if isinstance(value, bool):
+            if isinstance(value, list):
+                # Laisser les listes : requests répète le paramètre (chamber=pl&chamber=mi),
+                # format attendu par l'API Judilibre
+                clean_params[key] = [str(v) for v in value]
+            elif isinstance(value, bool):
                 # Convertir les booléens en chaînes minuscules (true/false)
                 # L'API Judilibre attend "true" et "false" en minuscules
                 clean_params[key] = "true" if value else "false"
-            # Les listes sont conservées telles quelles : requests les convertira
-            # automatiquement en paramètres multiples (ex: chamber=mi&chamber=pl)
         
         logger.info(f"Requête GET vers {endpoint} avec paramètres: {json.dumps(clean_params, ensure_ascii=False)}")
         
